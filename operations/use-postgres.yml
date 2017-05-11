@@ -4,9 +4,9 @@
   path: /releases/-
   value:
     name: postgres
-    url: https://bosh.io/d/github.com/cloudfoundry/postgres-release?v=13
-    sha1: db1b34e15edef77fac68d1b55fac6cd22841d2ff
-    version: "13"
+    url: https://bosh.io/d/github.com/cloudfoundry/postgres-release?v=16
+    sha1: b114fa78c017c7b6752e83c4d1e5d92309164e61
+    version: "16"
 
 - type: remove
   path: /instance_groups/name=mysql/jobs/name=mysql
@@ -17,6 +17,7 @@
   value:
     name: postgres
     release: postgres
+    provides: {postgres: {as: db}}
     properties:
       databases:
         address: sql-db.service.cf.internal
@@ -30,6 +31,9 @@
         - citext: true
           name: diego
           tag: diego
+        - citext: true
+          name: routing-api
+          tag: routing-api
         db_scheme: postgres
         port: 5524
         roles:
@@ -41,6 +45,9 @@
           tag: admin
         - name: diego
           password: ((diego_database_password))
+          tag: admin
+        - name: routing-api
+          password: ((routing_api_database_password))
           tag: admin
 - type: replace
   path: /instance_groups/name=mysql/name
@@ -93,6 +100,28 @@
     db_username: diego
     db_password: "((diego_database_password))"
     db_driver: postgres
+
+- type: replace
+  path: /instance_groups/name=api/jobs/name=routing-api/properties/routing_api/sqldb/type
+  value: postgres
+- type: replace
+  path: /instance_groups/name=api/jobs/name=routing-api/properties/routing_api/sqldb/port
+  value: 5524
+- type: replace
+  path: /instance_groups/name=postgres/jobs/name=postgres/properties/databases/databases/name=routing-api?/name
+  value: routing-api
+- type: replace
+  path: /instance_groups/name=postgres/jobs/name=postgres/properties/databases/databases/name=routing-api?/tag
+  value: routing-api
+- type: replace
+  path: /instance_groups/name=postgres/jobs/name=postgres/properties/databases/databases/name=routing-api?/citext
+  value: true
+- type: replace
+  path: /instance_groups/name=postgres/jobs/name=postgres/properties/databases/roles/name=routing-api?/name
+  value: routing-api
+- type: replace
+  path: /instance_groups/name=postgres/jobs/name=postgres/properties/databases/roles/name=routing-api?/tag
+  value: admin
 
 # --- Remove now unused cf-mysql release and variables ---
 - type: remove

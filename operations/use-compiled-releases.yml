@@ -1,5 +1,18 @@
-/tmp/build/beebf57e/compiled-release-tarball /tmp/build/beebf57e
-/tmp/build/beebf57e
-- https://storage.googleapis.com/cf-deployment-compiled-releases/cf-mysql-34-ubuntu-trusty-3363.12-20170329-234449-445820692.tgz
-- "34"
-- de1c63d79a7fc0c33f6d32c73f4b9ec5d54237f2
+- path: /releases/name=cf-mysql/url
+  type: replace
+  value: https://storage.googleapis.com/cf-deployment-compiled-releases/cf-mysql-35-ubuntu-trusty-3363.20-20170505-205025-018995745.tgz
+- path: /releases/name=cf-mysql/version
+  type: replace
+  value: "35"
+- path: /releases/name=cf-mysql/sha1
+  type: replace
+  value: 37b670a61c4fbbc6f2570a7adde4a9e7822e5a70
+- path: /releases/name=capi/url
+  type: replace
+  value: https://storage.googleapis.com/cf-deployment-compiled-releases/capi-1.28.0-ubuntu-trusty-3363.20-20170506-011340-468538037.tgz
+- path: /releases/name=capi/version
+  type: replace
+  value: 1.28.0
+- path: /releases/name=capi/sha1
+  type: replace
+  value: 80764edc7d15238698d95b5f0ff6ac1d18188528

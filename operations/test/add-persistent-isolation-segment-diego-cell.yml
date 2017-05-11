@@ -11,18 +11,22 @@
     - 100GB_ephemeral_disk
     stemcell: default
     networks:
-    - name: private
+    - name: default
     jobs:
     - name: consul_agent
       release: consul
       consumes:
-        consul: {from: consul_server}
+        consul: nil
+        consul_common: {from: consul_common_link}
+        consul_server: nil
+        consul_client: {from: consul_client_link}
     - name: cflinuxfs2-rootfs-setup
-      release: cflinuxfs2-rootfs
+      release: cflinuxfs2
     - name: garden
       release: garden-runc
       properties:
         garden:
+          cleanup_process_dirs_on_wait: true
           default_container_grace_time: 0
           destroy_containers_on_start: true
           graph_cleanup_threshold_in_mb: 0
@@ -47,11 +51,25 @@
             placement_tags:
             - persistent_isolation_segment
             require_tls: true
-            ca_cert: "((diego_rep_server.ca))"
-            server_cert: "((diego_rep_server.certificate))"
-            server_key: "((diego_rep_server.private_key))"
+            ca_cert: "((diego_rep_agent.ca))"
+            server_cert: "((diego_rep_agent.certificate))"
+            server_key: "((diego_rep_agent.private_key))"
           ssl:
             skip_cert_verify: true
+        tls:
+          ca_cert: "((diego_rep_agent.ca))"
+          cert: "((diego_rep_agent.certificate))"
+          key: "((diego_rep_agent.private_key))"
+    - name: route_emitter
+      release: diego
+      properties:
+        diego:
+          route_emitter:
+            local_mode: true
+            bbs:
+              ca_cert: "((diego_bbs_client.ca))"
+              client_cert: "((diego_bbs_client.certificate))"
+              client_key: "((diego_bbs_client.private_key))"
     - name: metron_agent
       release: loggregator
       properties:

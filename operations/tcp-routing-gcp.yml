@@ -13,18 +13,21 @@
     - internet-required
     - cf-tcp-router-network-properties
     networks:
-    - name: private
+    - name: default
     jobs:
     - name: consul_agent
       release: consul
       consumes:
-        consul: {from: consul_server}
+        consul: nil
+        consul_common: {from: consul_common_link}
+        consul_server: nil
+        consul_client: {from: consul_client_link}
     - name: tcp_router
       release: routing
       properties:
         tcp_router:
           oauth_secret: "((uaa_clients_tcp_router_secret))"
-          health_check_port: 8080
+          router_group: default-tcp
         uaa:
           ca_cert: "((uaa_ca.certificate))"
           tls_port: 8443
@@ -65,12 +68,15 @@
     - internet-required
     stemcell: default
     networks:
-    - name: private
+    - name: default
     jobs:
     - name: consul_agent
       release: consul
       consumes:
-        consul: {from: consul_server}
+        consul: nil
+        consul_common: {from: consul_common_link}
+        consul_server: nil
+        consul_client: {from: consul_client_link}
     - name: tcp_emitter
       release: routing
       properties:
@@ -88,67 +94,3 @@
     - name: metron_agent
       release: loggregator
       properties: *metron_agent_properties
-
-- type: replace
-  path: /instance_groups/name=api/jobs/-
-  value:
-    name: routing-api
-    release: routing
-    properties:
-      routing_api:
-        system_domain: "((system_domain))"
-        router_groups:
-        - name: default-tcp
-          type: tcp
-          reservable_ports: 1024-1123
-        sqldb:
-          type: mysql
-          host: sql-db.service.cf.internal
-          port: 3306
-          schema: routing-api
-          username: routing-api
-          password: "((cf_mysql_mysql_seeded_databases_routing_password))"
-      uaa:
-        ca_cert: "((uaa_ca.certificate))"
-        tls_port: 8443
-
-- type: replace
-  path: /instance_groups/name=mysql/jobs/name=mysql/properties/cf_mysql/mysql/seeded_databases/name=routing-api?/username
-  value: routing-api
-
-- type: replace
-  path: /instance_groups/name=mysql/jobs/name=mysql/properties/cf_mysql/mysql/seeded_databases/name=routing-api?/password
-  value: "((cf_mysql_mysql_seeded_databases_routing_password))"
-
-- type: replace
-  path: /variables/name=cf_mysql_mysql_seeded_databases_routing_password?/type
-  value: password
-
-- type: replace
-  path: /variables/name=uaa_clients_routing_api_client_secret?/type
-  value: password
-
-- type: replace
-  path: /instance_groups/name=router/jobs/name=gorouter/properties/routing_api?
-  value:
-    enabled: true
-
-- type: replace
-  path: /instance_groups/name=api/jobs/name=cloud_controller_ng/properties/routing_api?
-  value:
-    enabled: true
-
-- type: replace
-  path: /instance_groups/name=api/jobs/name=cloud_controller_ng/properties/ssl?/skip_cert_verify
-  value: true
-
-- type: replace
-  path: /instance_groups/name=api/jobs/name=consul_agent/properties/consul/agent/services/routing-api?
-  value: {}
-
-- type: replace
-  path: /instance_groups/name=uaa/jobs/name=uaa/properties/uaa/clients/routing_api_client?
-  value:
-    authorities: routing.routes.write,routing.routes.read,routing.router_groups.read
-    authorized_grant_type: client_credentials
-    secret: "((uaa_clients_routing_api_client_secret))"
