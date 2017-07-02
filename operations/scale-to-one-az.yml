@@ -2,12 +2,6 @@
 # Default cf-deployment deploys a (mostly) HA configuration.
 # Use this override to only deploy single instance of each job,
 # in a single Availability Zone.
-## Note: This also reduces the static IPs used by nats.
-- type: remove
-  path: /instance_groups/name=nats/networks/name=default/static_ips?/1
-- type: remove
-  path: /instance_groups/name=mysql/jobs/name=proxy/properties/nats/machines?/1
-
 - type: replace
   path: /instance_groups/name=consul/instances
   value: 1
@@ -21,7 +15,7 @@
   path: /instance_groups/name=etcd/jobs/name=etcd/properties/etcd/cluster/name=etcd/instances
   value: 1
 - type: replace
-  path: /instance_groups/name=diego-bbs/instances
+  path: /instance_groups/name=diego-api/instances
   value: 1
 - type: replace
   path: /instance_groups/name=uaa/instances
@@ -64,7 +58,7 @@
   path: /instance_groups/name=etcd/azs
   value: [ z1 ]
 - type: replace
-  path: /instance_groups/name=diego-bbs/azs
+  path: /instance_groups/name=diego-api/azs
   value: [ z1 ]
 - type: replace
   path: /instance_groups/name=uaa/azs

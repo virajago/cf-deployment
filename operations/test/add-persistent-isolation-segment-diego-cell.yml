@@ -16,7 +16,9 @@
     - name: consul_agent
       release: consul
       consumes:
-        consul: {from: consul_server}
+        consul_common: {from: consul_common_link}
+        consul_server: nil
+        consul_client: {from: consul_client_link}
     - name: cflinuxfs2-rootfs-setup
       release: cflinuxfs2
     - name: garden

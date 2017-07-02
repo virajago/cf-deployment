@@ -4,7 +4,6 @@
 Take a look at <a href='#readiness'>this table</a>
 to see if it's recommended that you use it.**
 
-
 ### Table of Contents
 * <a href='#purpose'>Purpose</a>
 * <a href='#readiness'>Is `cf-deployment` ready to use?</a>
@@ -74,16 +73,23 @@ about app availability during rolling deploys.
 When we think cf-deployment is ready,
 we'll update this section and make announcements on the cf-dev mailing list.
 
-**Migrating from cf-release:**
-The Release Integration team is still working on developing
-a migration path from cf-release.
-This use case is not sufficiently tested yet,
-and we don't advise anybody to attempt it
-until we develop the necessary tooling and guide.
+### Can I Transition from `cf-release`?
+A migration will be possible.
+It will be easier for some configurations
+than others.
+
+The Release Integration team
+is working on a transition path from `cf-release`.
+We don't advise anybody attempt the migration yet.
+Our in-progress tooling and documentation can be found at
+https://github.com/cloudfoundry/cf-deployment-transition
 
 ## <a name='deploying-cf'></a>Deploying CF
 
-#### Step 1: Get a BOSH Director
+### Step 1: Get a BOSH Director
+
+Bosh can be deployed as a standalone VM that manages complex workloads (i.e. CF) or a lite version for development purposes that uses containers to emulate VMs
+#### Bosh
 To deploy a BOSH Director to AWS or GCP,
 use [`bbl`](https://github.com/cloudfoundry/bosh-bootloader)
 (the Bosh BootLoader).
@@ -95,13 +101,18 @@ you'll need to take the following steps before deploying:
 export BOSH_CA_CERT=<PATH-TO-BOSH-LITE-REPO>/ca/certs/ca.crt
 bosh -e 192.168.50.4 update-cloud-config bosh-lite/cloud-config.yml
 ```
-
 ##### Step 1.5: Get load balancers
 For IaaSes like AWS and GCP,
 you'll need to use `bbl` to create load balancers as well
 by running `bbl create-lbs`.
 
-#### Step 2: Deploy CF
+
+#### Bosh-lite:
+If you're using bosh-lite on an IaaS, look at [this guide](bosh-lite.md)
+
+
+
+### Step 2: Deploy CF
 To deploy to a configured BOSH director using the new `bosh` CLI:
 
 ```
@@ -115,7 +126,7 @@ bosh -e my-env -d cf deploy cf-deployment/cf-deployment.yml \
 
 The CF Admin credentials will be stored in the file passed to the `--vars-store` flag
 (`env-repo/deployment.yml` in the example).
-You can find them by searching for `uaa_scim_users_admin_password`.
+You can find them by searching for `cf_admin_password`.
 
 If you're using a local bosh-lite,
 remember to add the `operations/bosh-lite.yml` ops-file
@@ -144,12 +155,11 @@ and tested with the latest sha of CATs.
 ## <a name='setup'></a>Setup and Prerequisites
 `cf-deployment` relies on newer BOSH features,
 and requires a bosh director with a valid cloud-config that has been configured with a certificate authority.
-It also requires the new alpha `bosh` CLI,
+It also requires the new `bosh` CLI,
 which it relies on to generate and fill-in needed variables.
 
 ### BOSH CLI
 `cf-deployment` requires the new [BOSH CLI](https://github.com/cloudfoundry/bosh-cli).
-It's in alpha, but has features necessary to use `cf-deployment`.
 
 ### BOSH `cloud-config`
 `cf-deployment` assumes that
@@ -165,14 +175,42 @@ to get it working for `cf-deployment`.
 `cf-deployment.yml` requires additional information
 to provide environment-specific or sensitive configuration
 such as the system domain and various credentials.
-To do this we use the `--vars-store` flag in the new BOSH CLI.
+To do this in the default configuration,
+we use the `--vars-store` flag in the new BOSH CLI.
 This flag takes the name of a `yml` file that it will read and write to.
 Where necessary credential values are not present,
-it will generate new values based on the type information stored in `cf-deployment.yml`.
-Variables passed in with `-v` or `-l` will override those already in the var store,
-but will also be stored there for future use.
-The `-v` flag is also the recommended mechanism for providing the system domain,
-which `bosh` is not equipped to generate.
+it will generate new values
+based on the type information stored in `cf-deployment.yml`.
+
+Necessary variables that BOSH can't generate
+need to be supplied as well.
+Though in the default case
+this is just the system domain,
+some ops files introduce additional variables.
+See the summary for the particular ops files you're using
+for any additional necessary variables.
+
+There are three ways to supply
+such additional variables.
+
+1. They can be provided by passing individual `-v` arguments.
+   The syntax for `-v` arguments is
+   `-v <variable-name>=<variable-value>`.
+   This is the recommended method for supplying
+   the system domain.
+2. They can be provided in a yaml file
+   accessed from the command line with the
+   `-l` or `--vars-file` flag.
+   This is the recommended method for configuring
+   external persistence services.
+3. They can be inserted directly in `--vars-store` file
+   alongside BOSH-managed variables.
+   This can confuse things,
+   but you may find the simplicity worth it.
+
+Variables passed with `-v` or `-l`
+will override those already in the var store,
+but will not be stored there.
 
 ## <a name='ops-files'></a>Ops Files
 The configuration of CF represented by `cf-deployment.yml` is intended to be a workable, secure, fully-featured default.
@@ -192,6 +230,13 @@ Here's an (alphabetical) summary:
   It's useful for deployments where tls termination is performed prior to the gorouter -
   for instance, on AWS, such termination is commonly done at the ELB.
   This also eliminates the need to specify `((router_ssl.certificate))` and `((router_ssl.private_key))` in the var files.
+- `operations/configure-default-router-group.yml` -
+  this file allows deployer to configure reservable ports for default tcp
+  router group by passing variable `default_router_group_reservable_ports`.
+- `operations/enable-privileged-container-support.yml` -
+  enables diego privileged container support on cc-bridge.
+  This opsfile might not be compatible with opsfiles
+  that inline bridge functionality to cloud-controller.
 - `operations/gcp.yml` -
   this file was intentionally left blank and left for backwards compatibility. It previously overrode the static IP addresses assigned to some instance groups,
   as GCP networking features allow them to all co-exist on the same subnet
@@ -204,23 +249,102 @@ Here's an (alphabetical) summary:
 - `operations/test/add-datadog-firehose-nozzle-aws.yml` -
   Deploys a datadog-firehose-nozzle that collects system metric and posts to datadog.
   For AWS only.
-- `operations/tcp-routing-gcp.yml` - this ops file adds TCP router and routing api for GCP.
-  Not directly compatible with the `use-postgres` ops file;
-  see that ops file's entry
-  for details.
+- `operations/tcp-routing-gcp.yml` -
+  this ops file adds TCP routers for GCP.
+- `operations/use-external-dbs.yml` -
+  removes the MySQL instance group,
+  cf-mysql release, and all cf-mysql variables.
+  This requires an external data store.
+  Introduces new variables for DB connection
+  details which will need to be provided at deploy time.
+  The new variables are all strings
+  (except db_port, which is an integer).
+  Their names are:
+  ```
+  db_scheme
+  db_port
+  cc_db_name
+  cc_db_address
+  cc_db_username
+  cc_db_password
+  uaa_db_name
+  uaa_db_address
+  uaa_db_username
+  uaa_db_password
+  bbs_db_name
+  bbs_db_address
+  bbs_db_username
+  bbs_db_password
+  routing_api_db_name
+  routing_api_db_address
+  routing_api_db_username
+  routing_api_db_password
+  ```
+  This must be applied _before_
+  any ops files that removes jobs that use a database,
+  such as the ops file to remove the routing API.
+  **Warning**: this does not migrate data,
+  and will delete existing database instance groups.
 - `operations/use-postgres.yml` -
   replaces the MySQL instance group
   with a postgres instance group.
   **Warning**: this will lead to total data loss
   if applied to an existing deployment with MySQL
   or removed from an existing deployment with postgres.
-  Requires an additional ops file to work with
-  the `tcp-routing-gcp` ops file.
-  See the next entry for details.
-- `use-postgres-tcp-routing` - builds on
-  `tcp-routing-gcp` and `use-postgres`
-  to use the postgres database for TCP routing.
-  Must come after the other two.
+- `use-s3-blobstore.yml` -
+  replaces local WebDAV blobstore with external
+  s3 blobstore. Introduces new variables for
+  AWS credentials and bucket names,
+  which will need to be provided at deploy time.
+  The new variables are all strings.
+  Their names are:
+  ```
+  aws_region
+  blobstore_access_key_id
+  blobstore_secret_access_key
+  app_package_directory_key
+  buildpack_directory_key
+  droplet_directory_key
+  resource_directory_key
+  ```
+- `operations/windows-cell.yml` -
+  deploys a windows diego cell,
+  adds releases necessary for windows.
+
+### A note on `experimental` and `test` ops-files
+The `operations` directory includes two subdirectories
+for "experimental" and "test" ops-files.
+
+#### Experimental
+"Experimental" ops-files represent configurations
+that we expect to promote to blessed configuration eventually,
+meaning that,
+once the configurations have been sufficiently validated,
+they will become part of cf-deployment.yml
+and the ops-files will be removed.
+
+#### Test
+"Test" ops-files are configurations
+that we run in our testing pipeline
+to enable certain features.
+We include them in the public repository
+(rather than in our private CI repositories)
+for a few reasons,
+depending on the particular ops-file.
+
+Some files are included
+because we suspect that the configurations will be commonly needed
+but not easily generalized.
+For example,
+`add-persistent-isolation-segment.yml` shows how a deployer can add an isolated Diego cell,
+but the ops-file is hard to apply repeatably.
+In this case, the ops-file is an example.
+
+Others,
+like `cfr-to-cfd-transition.yml`,
+will eventually be promoted to the `operations` directory,
+but are still being modified regularly.
+In this case, the ops-file is included for public visibility.
 
 ## <a name='ci'></a>CI
 The [ci](https://release-integration.ci.cf-app.com/teams/main/pipelines/cf-deployment) for `cf-deployment`

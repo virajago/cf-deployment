@@ -6,18 +6,18 @@
   - name: default
     static_ips: [10.244.0.34]
 
-# --- Remove unnecessary static ips for nats_machines ---
-- type: remove
-  path: /instance_groups/name=nats/networks/name=default/static_ips
-
 # --- Replace MySQL job with Postgres ---
 - type: replace
   path: /releases/-
   value:
     name: postgres
-    url: https://bosh.io/d/github.com/cloudfoundry/postgres-release?v=13
-    sha1: db1b34e15edef77fac68d1b55fac6cd22841d2ff
-    version: "13"
+    url: https://bosh.io/d/github.com/cloudfoundry/postgres-release?v=16
+    sha1: b114fa78c017c7b6752e83c4d1e5d92309164e61
+    version: "16"
+
+- type: replace
+  path: /instance_groups/name=cc-bridge/jobs/name=nsync/properties/capi/nsync/diego_privileged_containers?
+  value: true
 
 - type: remove
   path: /instance_groups/name=mysql/jobs/name=mysql
@@ -28,9 +28,10 @@
   value:
     name: postgres
     release: postgres
+    provides: {postgres: {as: db}}
     properties:
       databases:
-        address: sql-db.service.internal
+        address: sql-db.service.cf.internal
         databases:
         - citext: true
           name: cloud_controller
@@ -44,6 +45,12 @@
         - citext: true
           name: routing-api
           tag: routing-api
+        - citext: false
+          name: network_policy
+          tag: networkpolicy
+        - citext: false
+          name: network_connectivity
+          tag: networkconnectivity
         db_scheme: postgres
         port: 5524
         roles:
@@ -59,6 +66,12 @@
         - name: routing-api
           password: ((routing_api_database_password))
           tag: admin
+        - name: network_policy
+          password: ((network_policy_database_password))
+          tag: admin
+        - name: network_connectivity
+          password: ((network_connectivity_database_password))
+          tag: admin
 - type: replace
   path: /instance_groups/name=mysql/name
   value: postgres
@@ -73,7 +86,6 @@
   path: /instance_groups/name=api/jobs/name=cloud_controller_ng/properties/ccdb
   value: &ccdb
     db_scheme: postgres
-    address: sql-db.service.cf.internal
     roles:
     - tag: admin
       name: cloud_controller
@@ -98,7 +110,6 @@
   path: /instance_groups/name=uaa/jobs/name=uaa/properties/uaadb
   value:
     db_scheme: postgresql
-    address: sql-db.service.cf.internal
     roles:
     - tag: admin
       name: uaa
@@ -108,7 +119,7 @@
       name: uaa
     port: 5524
 - type: replace
-  path: /instance_groups/name=diego-bbs/jobs/name=bbs/properties/diego/bbs/sql
+  path: /instance_groups/name=diego-api/jobs/name=bbs/properties/diego/bbs/sql
   value:
     db_host: sql-db.service.cf.internal
     db_port: 5524
@@ -116,6 +127,24 @@
     db_username: diego
     db_password: "((diego_database_password))"
     db_driver: postgres
+- type: replace
+  path: /instance_groups/name=api/jobs/name=policy-server/properties/cf_networking/policy_server/database
+  value:
+    type: postgres
+    username: network_policy
+    password: ((network_policy_database_password))
+    host: sql-db.service.cf.internal
+    port: 5524
+    name: network_policy
+- type: replace
+  path: /instance_groups/name=diego-api/jobs/name=silk-controller/properties/cf_networking/silk_controller/database
+  value:
+    type: postgres
+    username: network_connectivity
+    password: ((network_connectivity_database_password))
+    host: sql-db.service.cf.internal
+    port: 5524
+    name: network_connectivity
 
 # --- Remove now unused cf-mysql release and variables ---
 - type: remove
@@ -218,7 +247,7 @@
   - instances: 1
     name: etcd
 - type: replace
-  path: /instance_groups/name=diego-bbs/instances
+  path: /instance_groups/name=diego-api/instances
   value: 1
 - type: replace
   path: /instance_groups/name=uaa/instances

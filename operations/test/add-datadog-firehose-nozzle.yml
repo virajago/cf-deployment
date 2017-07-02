@@ -3,7 +3,7 @@
   path: /instance_groups/name=uaa/jobs/name=uaa/properties/uaa/clients/datadog-firehose-nozzle?
   value:
     access-token-validity: 1209600
-    authorized-grant-types: authorization_code,client_credentials,refresh_token
+    authorized-grant-types: client_credentials,refresh_token
     override: true
     secret: "((uaa_clients_datadog-firehose-nozzle_secret))"
     scope: openid,oauth.approvals,doppler.firehose
@@ -27,7 +27,7 @@
       release: datadog-firehose-nozzle
       properties:
         loggregator:
-          traffic_controller_url: "wss://doppler.((system_domain)):4443"
+          traffic_controller_url: "wss://doppler.((system_domain)):((traffic_controller_external_port))"
         datadog:
           api_key: "((datadog_api_key))"
           flush_duration_seconds: 15
